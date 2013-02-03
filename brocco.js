@@ -62,9 +62,9 @@
 
 var Brocco = (function() {
   var version = "0.1.0";
-  
+
   // ## Main Documentation Generation Functions
-  
+
   // Generate the documentation for a source file by (optionally) reading it
   // in, splitting it up into comment/code sections, highlighting them for
   // the appropriate language, running the comment sections through Markdown
@@ -99,7 +99,7 @@ var Brocco = (function() {
     code = config.code;
     if (!config.template)
       config.template = defaultTemplate;
-    
+
     if (!callback)
       callback = insertHtmlIntoBody;
 
@@ -112,7 +112,7 @@ var Brocco = (function() {
       parseAndHighlight = function() {
         language.makeSections(source, code, config, renderSections);
       };
-      
+
     if (typeof(code) == "undefined") {
       getSourceFile(source, function(contents) {
         code = contents;
@@ -133,7 +133,7 @@ var Brocco = (function() {
   //       codeHtml: ...
   //     }
   function parse(source, code) {
-    var codeText, docsText, hasCode, language, line, lines, save, 
+    var codeText, docsText, hasCode, language, line, lines, save,
         sections, _i, _len;
     lines = code.split('\n');
     sections = [];
@@ -147,7 +147,14 @@ var Brocco = (function() {
     };
     for (_i = 0, _len = lines.length; _i < _len; _i++) {
       line = lines[_i];
-      if (line.match(language.commentMatcher) &&
+      if (line.match(/\s*(\/\*\*|\*|\*\/)/)) {
+        if (hasCode) {
+          save(docsText, codeText);
+          hasCode = docsText = codeText = '';
+        }
+        line = line.replace(/\s*(\/\*\*|\*|\*\/)/, '');
+        if (line !== '/') docsText += line + '\n';
+      } else if (line.match(language.commentMatcher) &&
           !line.match(language.commentFilter)) {
         if (hasCode) {
           save(docsText, codeText);
@@ -162,7 +169,7 @@ var Brocco = (function() {
     save(docsText, codeText);
     return sections;
   };
-  
+
   // Highlights parsed sections of code. If no syntax highlighter is present,
   // output the code in plain text.
   function highlight(source, sections, config, callback) {
@@ -187,7 +194,7 @@ var Brocco = (function() {
       return callback();
     });
   }
-  
+
   function generateHtml(source, sections, config) {
     var title = path.basename(source);
     return config.template({
@@ -197,7 +204,7 @@ var Brocco = (function() {
   };
 
   // ## Helpers & Setup
-  
+
   // Mappings between CodeMirror styles and the Pygments styles
   // defined in `docco.css`.
   var codeMirrorStyleMap = {
@@ -210,7 +217,7 @@ var Brocco = (function() {
     "tag": "nt",
     "attribute": "na"
   };
-  
+
   // Each item maps the file extension to the name of the CodeMirror mode
   // and the symbol that indicates a comment.
   //
@@ -242,7 +249,7 @@ var Brocco = (function() {
     ".hrl":
       {"name" : "erlang", "symbol" : "%"}
   };
-  
+
   // This is a stand-in for node's <code>[path][]</code> module.
   //
   //   [path]: http://nodejs.org/api/path.html
@@ -257,7 +264,7 @@ var Brocco = (function() {
       return '.' + filename.split('.').slice(-1)[0];
     }
   };
-  
+
   // This is a modified version of CodeMirror's [runmode][],
   // used to leverage CodeMirror's code editing modes for
   // syntax highlighting.
@@ -276,7 +283,7 @@ var Brocco = (function() {
     });
     if (mode.name == "null")
       return nullHighlighter(language, fragments, cb);
-      
+
     var esc = htmlEscape;
     var string = fragments.join("\n" + language.symbol + "DIVIDER\n");
     var tabSize = CodeMirror.defaults.tabSize;
@@ -315,7 +322,7 @@ var Brocco = (function() {
       } else
         accum.push(escaped);
     };
-    
+
     var lines = CodeMirror.splitLines(string),
         state = CodeMirror.startState(mode);
     for (var i = 0, e = lines.length; i < e; ++i) {
@@ -327,13 +334,13 @@ var Brocco = (function() {
         stream.start = stream.pos;
       }
     }
-    
+
     fragments = accum.join("")
       .split('\n<span class="c cm-comment">' +
              language.symbol + 'DIVIDER</span>\n');
     cb(fragments.map(function(code) { return '<pre>' + code + '</pre>'; }));
   }
-  
+
   // This null syntax highlighter doesn't do any syntax highlighting at
   // all; it just plops the plain-text source code in a `<pre>` element.
   function nullHighlighter(language, fragments, cb) {
@@ -341,8 +348,8 @@ var Brocco = (function() {
       return '<pre>' + htmlEscape(code) + '</pre>';
     }));
   }
-  
-  // This default template produces an identical DOM to the 
+
+  // This default template produces an identical DOM to the
   // <code>[docco.jst][]</code> template used by Docco for single-source
   // files. It's just easier to inline it than grab it via XHR because it
   // complicates the use and deployment of this browser-side script.
@@ -403,7 +410,7 @@ var Brocco = (function() {
     document.body.innerHTML = html;
     scrollLocationHashIntoView();
   }
-  
+
   // This helper does a bit of hackery to ensure that
   // named anchors are automatically navigated to when a
   // page is first loaded.
@@ -420,14 +427,14 @@ var Brocco = (function() {
       }
     }, 0);
   }
-  
+
   // Leverage the DOM to do HTML escaping for us.
   function htmlEscape(text) {
     var div = document.createElement('div');
     div.appendChild(document.createTextNode(text));
     return div.innerHTML;
   }
-  
+
   // Retrieve the given source file over XHR. If an error occurs
   // and we're on a `file:` URL, there's a good chance it's
   // due to browser security restrictions, so provide content
@@ -449,35 +456,35 @@ var Brocco = (function() {
     req.onload = function() { cb(req.responseText); };
     req.send(null);
   }
-  
+
   // Get the current language we're documenting, based on the extension.
   function getLanguage(source) {
     return languages[path.extname(source)];
   };
-  
+
   // Build out the appropriate matchers and delimiters for each language.
   function processLanguages(languages) {
     for (var ext in languages) {
       var l = languages[ext];
       // Does the line begin with a comment?
       l.commentMatcher = RegExp("^\\s*" + l.symbol + "\\s?");
-      
+
       // Ignore [hashbangs][] and interpolations...
       //
       //   [hashbangs]: http://en.wikipedia.org/wiki/Shebang_(Unix\)
       l.commentFilter = /(^#![/]|^\s*#\{)/;
     }
   }
-  
+
   // This helper makes it easy to add new languages.
   function addLanguages(l) {
     processLanguages(l);
     for (var ext in l)
       languages[ext] = l[ext];
   }
-  
+
   processLanguages(languages);
-  
+
   // ## Exports
   //
   // Information about Brocco, and functions for programmatic usage.
